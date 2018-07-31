@@ -2,7 +2,7 @@ import socket
 import select
 
 
-server_ip = '25.82.159.185'
+server_ip = ''
 server_port = 5060
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

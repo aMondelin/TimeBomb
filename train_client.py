@@ -1,7 +1,7 @@
 import socket
 
 
-server_ip = "25.82.159.185"
+server_ip = '127.0.0.1'
 server_port = 5060
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -1,7 +1,9 @@
 import random
 import socket
+import select
 
 
+GAME_SERVER = 0
 GAME_FINISHED = "GAME_FINISHED"
 TEAM_SHERLOCK = "TEAM_SHERLOCK"
 TEAM_MORIARTY = "TEAM_MORIARTY"
@@ -48,8 +50,9 @@ def init_player_sides(player_count):
 
 
 def ask_player_count():
-    wrong_count = True
+    ask_player_count = 0
 
+    wrong_count = True
     while wrong_count:
         ask_player_count = input("Combien de joueurs? (4 a 8 joueurs):")
 
@@ -77,7 +80,9 @@ def ask_for_player(player, players):
         player_list = "\n".join(player_names)
     )
 
-    number = raw_input(question)
+    player.send(question)
+    number = player.recv(1024)
+    number = number.decode()
 
     try:
         number = int(number)
@@ -133,6 +138,16 @@ class Game(object):
         self.round_index = 0
         self.defuse_found_count = 0
         self.current_player_index = random.randint(0, self.player_count)
+
+    def _launch_server(self):
+        global GAME_SERVER
+
+        game_ip = ''
+        game_port = 5060
+
+        GAME_SERVER = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        GAME_SERVER.bind((game_ip, game_port))
+        GAME_SERVER.listen(5)
 
     def _all_players_initialized(self):
         return len(self.players) == self.player_count
@@ -244,28 +259,45 @@ class Game(object):
 if __name__ == '__main__':
     game = Game()
 
-    # while True:
-    #     game_state = game.step()
-    #     if game_state == GAME_FINISHED:
-    #         break
+    game._launch_server()
 
-    # Creation du serveur
-    game_ip = ''
-    game_port = 46500
-
-    game_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    game_server.bind((game_ip, game_port))
-    game_server.listen(5)
-
-    server_launched = True
     players_online = []
-
+    server_launched = True
     while server_launched:
+        asked_connections, wlist, xlist = select.select([GAME_SERVER], [], [], 0.05)
 
+        for connection in asked_connections:
+            new_player, player_infos = connection.accept()
+            players_online.append(new_player)
+            new_player.send(b"Vous etes connecte au serveur. Bonne partie!")
+
+        # --
+        player_to_read = []
+        try:
+            player_to_read, wlist, xlist = select.select(players_online, [], [], 0.05)
+        except select.error:
+            pass
+        else:
+            for player in player_to_read:
+                received_msg = player.recv(1024)
+                received_msg = received_msg.decode()
+                print players_online
+                print(received_msg)
+                player.send(b"5/5")
+
+                if received_msg == "fin":
+                    server_launched = False
+
+        if len(players_online) == game.player_count:
+            game_state = game.step()
+            if game_state == GAME_FINISHED:
+                break sur
 
     print("The game is done!")
 
     question = "Wanna retry? y/n"
-
     answer = raw_input(question)
 
+    for new_player in players_online:
+        new_player.close()
+    GAME_SERVER.close()
