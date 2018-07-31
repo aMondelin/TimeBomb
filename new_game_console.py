@@ -291,7 +291,7 @@ if __name__ == '__main__':
         if len(players_online) == game.player_count:
             game_state = game.step()
             if game_state == GAME_FINISHED:
-                break sur
+                break
 
     print("The game is done!")
 
