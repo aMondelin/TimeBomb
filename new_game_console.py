@@ -31,15 +31,13 @@ class Player(object):
         self.name = name
         self.cards = list()
         self.team = None
-        self.player_socket = None
+        self.socket = None
 
 
 def ask_player_name(asked_player):
-    player_name = "Enter player's name:"
+    question = "Enter player's name:"
 
-    asked_player.send(player_name)
-    received_msg = asked_player.recv(1024)
-    received_msg = received_msg.decode()
+    received_msg = send_question(asked_player, question)
 
     return received_msg
 
@@ -98,10 +96,7 @@ def ask_for_player(player, players):
         player_list = "\n".join(player_names)
     )
 
-    ask_player = player.player_socket
-    ask_player.send(question)
-    number = ask_player.recv(1024)
-    number = number.decode()
+    number = send_question(player.socket, question)
 
     try:
         number = int(number)
@@ -123,6 +118,29 @@ def print_all_players(players):
             nb_cards = len(player.cards),
             deck_card = player.cards
         )
+
+
+def display_deck(player):
+    deck = "Vous avez {deck_card}\n".format(
+        deck_card = player.cards
+    )
+
+    return deck
+
+
+def send_question(player, message):
+    encode_msg = b"_w_" + message
+    player.send(encode_msg)
+
+    players_answer = player.recv(1024)
+    players_answer = players_answer.decode()
+
+    return players_answer
+
+
+def send_infos(player, message):
+    encode_msg = b"_r_" + message
+    player.send(encode_msg)
 
 
 def ask_for_card(current_player, player_chosen):
@@ -206,6 +224,10 @@ class Game(object):
             for card in range(number_cards):
                 player.cards.append(self._card_to_give())
 
+            player_socket = player.socket
+            player_deck = display_deck(player)
+            player_socket.send(b"_r_" + str(player_deck))
+
     def _selectable_players(self, current_player):
         selectable_players = list()
 
@@ -279,10 +301,12 @@ if __name__ == '__main__':
             player_name = ask_player_name(new_player)
 
             player_object = Player(player_name)
-            player_object.player_socket = new_player
+            player_object.socket = new_player
 
             players_online.append(player_object)
-            new_player.send(b"Vous etes connecte au serveur. Bonne partie!")
+
+            welcome_message = "Vous etes connecte au serveur. Bonne partie!"
+            send_infos(new_player, welcome_message)
 
         if len(players_online) == game.player_count:
             game.players = players_online
