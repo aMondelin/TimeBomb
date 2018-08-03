@@ -3,7 +3,7 @@ import socket
 import select
 
 
-GAME_SERVER = 0
+GAME_SERVER = None
 GAME_FINISHED = "GAME_FINISHED"
 TEAM_SHERLOCK = "TEAM_SHERLOCK"
 TEAM_MORIARTY = "TEAM_MORIARTY"
@@ -13,11 +13,35 @@ CARD_DEFUSE = "CARD_DEFUSE"
 DEFAULT_TEAMS = {4: [3, 1], 5: [3, 2], 6: [4, 2], 7: [5, 3], 8: [5, 3]}
 
 
+def launch_server():
+    global GAME_SERVER
+
+    game_ip = ''
+    game_port = 5060
+
+    GAME_SERVER = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    GAME_SERVER.bind((game_ip, game_port))
+    GAME_SERVER.listen(5)
+
+    print("Server launched!")
+
+
 class Player(object):
     def __init__(self, name):
         self.name = name
         self.cards = list()
         self.team = None
+        self.player_socket = None
+
+
+def ask_player_name(asked_player):
+    player_name = "Enter player's name:"
+
+    asked_player.send(player_name)
+    received_msg = asked_player.recv(1024)
+    received_msg = received_msg.decode()
+
+    return received_msg
 
 
 def init_deck(player_count):
@@ -64,12 +88,6 @@ def ask_player_count():
     return ask_player_count
 
 
-def ask_player_name():
-    player_name = raw_input("Enter player's name:")
-    new_player = Player(player_name)
-    return new_player
-
-
 def ask_for_player(player, players):
     player_names = list()
     for index, current_player in enumerate(players):
@@ -80,8 +98,9 @@ def ask_for_player(player, players):
         player_list = "\n".join(player_names)
     )
 
-    player.send(question)
-    number = player.recv(1024)
+    ask_player = player.player_socket
+    ask_player.send(question)
+    number = ask_player.recv(1024)
     number = number.decode()
 
     try:
@@ -132,25 +151,17 @@ class Game(object):
 
     def __init__(self):
         self.player_count = ask_player_count()
-        self.players = list()
+        self.players = None
         self.player_sides = init_player_sides(self.player_count)
         self.deck = init_deck(self.player_count)
         self.round_index = 0
         self.defuse_found_count = 0
         self.current_player_index = random.randint(0, self.player_count)
 
-    def _launch_server(self):
-        global GAME_SERVER
-
-        game_ip = ''
-        game_port = 5060
-
-        GAME_SERVER = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        GAME_SERVER.bind((game_ip, game_port))
-        GAME_SERVER.listen(5)
-
-    def _all_players_initialized(self):
-        return len(self.players) == self.player_count
+    def _assign_players_team(self):
+        for player in self.players:
+            if not player.team:
+                player.team = self._player_side()
 
     def _player_side(self):
         random_int = random.randint(0, len(self.player_sides) - 1)
@@ -207,11 +218,9 @@ class Game(object):
 
     def step(self):
         # Init Players
-        if not self._all_players_initialized():
-            new_player = ask_player_name()
-            new_player.team = self._player_side()
-            self.players.append(new_player)
-            return
+        if self.round_index == 0:
+            self._assign_players_team()
+            self._deal_cards()
 
         # Deal Cards
         check_round_number = self._check_round()
@@ -257,9 +266,8 @@ class Game(object):
 
 
 if __name__ == '__main__':
+    launch_server()
     game = Game()
-
-    game._launch_server()
 
     players_online = []
     server_launched = True
@@ -268,28 +276,18 @@ if __name__ == '__main__':
 
         for connection in asked_connections:
             new_player, player_infos = connection.accept()
-            players_online.append(new_player)
+            player_name = ask_player_name(new_player)
+
+            player_object = Player(player_name)
+            player_object.player_socket = new_player
+
+            players_online.append(player_object)
             new_player.send(b"Vous etes connecte au serveur. Bonne partie!")
 
-        # --
-        player_to_read = []
-        try:
-            player_to_read, wlist, xlist = select.select(players_online, [], [], 0.05)
-        except select.error:
-            pass
-        else:
-            for player in player_to_read:
-                received_msg = player.recv(1024)
-                received_msg = received_msg.decode()
-                print players_online
-                print(received_msg)
-                player.send(b"5/5")
-
-                if received_msg == "fin":
-                    server_launched = False
-
         if len(players_online) == game.player_count:
+            game.players = players_online
             game_state = game.step()
+
             if game_state == GAME_FINISHED:
                 break
 
