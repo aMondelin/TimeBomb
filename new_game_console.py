@@ -12,6 +12,9 @@ CARD_NEUTRAL = "CARD_NEUTRAL"
 CARD_DEFUSE = "CARD_DEFUSE"
 DEFAULT_TEAMS = {4: [3, 1], 5: [3, 2], 6: [4, 2], 7: [5, 3], 8: [5, 3]}
 
+WIN_MSG = "VOUS AVEZ GAGNE LA PARTIE.\n"
+LOSE_MSG  = "VOUS AVEZ PERDU LA PARTIE.\n"
+
 
 def launch_server():
     global GAME_SERVER
@@ -24,6 +27,27 @@ def launch_server():
     GAME_SERVER.listen(5)
 
     print("Server launched!")
+
+
+def send_question(player, message):
+    encode_msg = b"_w_" + message
+    player.send(encode_msg)
+
+    players_answer = player.recv(1024)
+    players_answer = players_answer.decode()
+
+    return players_answer
+
+
+def send_infos(players, message):
+    encode_msg = b"_r_" + message
+
+    for player in players:
+        try:
+            player.send(encode_msg)
+        except:
+            player_socket = player.socket
+            player_socket.send(encode_msg)
 
 
 class Player(object):
@@ -101,14 +125,36 @@ def ask_for_player(player, players):
     try:
         number = int(number)
     except ValueError:
-        print("Mauvais numero!")
+        send_infos([player.socket], "Mauvais numero!")
         return ask_for_player(player, players)
 
     if number not in range(len(players)):
-        print("Mauvais numero!")
+        send_infos([player.socket], "Mauvais numero!")
         return ask_for_player(player, players)
 
     return players[number]
+
+
+def ask_for_card(current_player, player_chosen):
+    question = "{current_player}, choisissez une carte 0 a {max_cards} parmi celles de {player_chosen}\n:".format(
+        current_player = current_player.name,
+        max_cards = len(player_chosen.cards) - 1,
+        player_chosen = player_chosen.name
+    )
+
+    number = send_question(current_player.socket, question)
+
+    try:
+        number = int(number)
+    except ValueError:
+        send_infos([current_player.socket], "Mauvais numero!")
+        return ask_for_card(current_player, player_chosen)
+
+    if number not in range(len(player_chosen.cards)):
+        send_infos([current_player.socket], "Mauvais numero!")
+        return ask_for_card(current_player, player_chosen)
+
+    return player_chosen.cards[number]
 
 
 def print_all_players(players):
@@ -120,49 +166,20 @@ def print_all_players(players):
         )
 
 
+def display_team(player):
+    player_team = "Vous etes dans la {team}\n".format(
+        team = player.team
+    )
+
+    return player_team
+
+
 def display_deck(player):
     deck = "Vous avez {deck_card}\n".format(
         deck_card = player.cards
     )
 
     return deck
-
-
-def send_question(player, message):
-    encode_msg = b"_w_" + message
-    player.send(encode_msg)
-
-    players_answer = player.recv(1024)
-    players_answer = players_answer.decode()
-
-    return players_answer
-
-
-def send_infos(player, message):
-    encode_msg = b"_r_" + message
-    player.send(encode_msg)
-
-
-def ask_for_card(current_player, player_chosen):
-    question = "{current_player}, choisissez une carte 0 a {max_cards} parmi celles de {player_chosen}\n:".format(
-        current_player = current_player.name,
-        max_cards = len(player_chosen.cards) - 1,
-        player_chosen = player_chosen.name
-    )
-
-    number = raw_input(question)
-
-    try:
-        number = int(number)
-    except ValueError:
-        print("Mauvais numero!")
-        return ask_for_card(current_player, player_chosen)
-
-    if number not in range(len(player_chosen.cards)):
-        print("Mauvais numero!")
-        return ask_for_card(current_player, player_chosen)
-
-    return player_chosen.cards[number]
 
 
 class Game(object):
@@ -180,6 +197,10 @@ class Game(object):
         for player in self.players:
             if not player.team:
                 player.team = self._player_side()
+                player_team = display_team(player)
+
+                player_socket = player.socket
+                player_socket.send(b"_r_" + str(player_team))
 
     def _player_side(self):
         random_int = random.randint(0, len(self.player_sides) - 1)
@@ -238,6 +259,28 @@ class Game(object):
 
         return selectable_players
 
+    def _return_all_player_in_team(self, chosen_team):
+        pick_team = list()
+
+        for player in self.players:
+            if player.team == chosen_team:
+                pick_team.append(player)
+
+        return pick_team
+
+    def _final_announces(self, winner):
+        bad_team = self._return_all_player_in_team(TEAM_MORIARTY)
+        good_team = self._return_all_player_in_team(TEAM_SHERLOCK)
+
+        if winner == "sherlock":
+            send_infos(good_team, WIN_MSG)
+            send_infos(bad_team, LOSE_MSG)
+        elif winner == "moriarty":
+            send_infos(good_team, LOSE_MSG)
+            send_infos(bad_team, WIN_MSG)
+
+        return
+
     def step(self):
         # Init Players
         if self.round_index == 0:
@@ -260,15 +303,17 @@ class Game(object):
         self.current_player_index = self.players.index(player_chosen)
         self.round_index += 1
 
-        # if self.round_index == 5:
-        #     return GAME_FINISHED
-
         if self.round_index == self.player_count * 4:
-            print "Vous n'avez pas pu desamorcer la bombe a temps. L'equipe de Moriarty gagne la partie!\n"
+            msg_card_chosen = "La bombe n'a pas pu etre desamorcee a temps...\n"
+            send_infos(self.players, msg_card_chosen)
+
+            self._final_announces("moriarty")
+
             return GAME_FINISHED
 
         if card_chosen == CARD_NEUTRAL:
-            print "Vous avez retourne une carte neutre.\n"
+            msg_card_chosen = "Une carte neutre a ete retournee.\n"
+            send_infos(self.players, msg_card_chosen)
             return
 
         if card_chosen == CARD_DEFUSE:
@@ -276,14 +321,23 @@ class Game(object):
             defuse_to_found = self.player_count - self.defuse_found_count
 
             if defuse_to_found == 0:
-                print "La bombe a ete desamorcee. L'equipe de Sherlock gagne la partie!\n"
+                msg_card_chosen = "La bombe a ete desamorcee!\n"
+                send_infos(self.players, msg_card_chosen)
+
+                self._final_announces("sherlock")
+
                 return GAME_FINISHED
             else:
-                print "Vous avez retourne une carte defuse. Il ne vous en reste plus que {}\n".format(defuse_to_found)
+                msg_card_chosen = "Une carte difuse vient d'etre retournee. Il n'en reste plus que {}.\n".format(defuse_to_found)
+                send_infos(self.players, msg_card_chosen)
                 return
 
         if card_chosen == CARD_BOMB:
-            print "Vous avez retourne la bombe. L'equipe de Moriarty gagne la partie!\n"
+            msg_card_chosen = "La bombe vient d'exploser.\n"
+            send_infos(self.players, msg_card_chosen)
+
+            self._final_announces("moriarty")
+
             return GAME_FINISHED
 
 
@@ -305,8 +359,8 @@ if __name__ == '__main__':
 
             players_online.append(player_object)
 
-            welcome_message = "Vous etes connecte au serveur. Bonne partie!"
-            send_infos(new_player, welcome_message)
+            welcome_message = "Vous etes connecte au serveur. Bonne partie!\n"
+            send_infos([new_player], welcome_message)
 
         if len(players_online) == game.player_count:
             game.players = players_online
