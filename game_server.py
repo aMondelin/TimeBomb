@@ -328,7 +328,7 @@ class Game(object):
 
                 return GAME_FINISHED
             else:
-                msg_card_chosen = "Une carte difuse vient d'etre retournee. Il n'en reste plus que {}.\n".format(defuse_to_found)
+                msg_card_chosen = "Une carte defuse vient d'etre retournee. Il n'en reste plus que {}.\n".format(defuse_to_found)
                 send_infos(self.players, msg_card_chosen)
                 return
 
