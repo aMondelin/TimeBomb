@@ -1,8 +1,10 @@
-import sys, json
+import os, sys, json
 from PySide.QtGui import *
 
 
 def read_bdd():
+    bdd_player_path = os.getcwd()
+    bdd_player_path = os.path.join(bdd_player_path, "bdd_players.json")
     with open(bdd_player_path, 'r') as f_json:
         bdd_file = json.load(f_json)
 
@@ -75,6 +77,8 @@ class connectionUi(QWidget):
         self.show()
 
     def join_game_ui(self):
+        bdd = read_bdd()
+        print bdd["Antho"]
         self.join_game_ui = joinGameUi()
         self.close()
 
