@@ -1,3 +1,6 @@
-toto = "_t_efgetfgverinfv"
+import hashlib
 
-print toto[3:]
+mdp = hashlib.sha1(b'Antho')
+mdp = mdp.hexdigest()
+
+print mdp
