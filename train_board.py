@@ -1,9 +1,15 @@
-import os
-import hashlib
+import json
 
-mdp = hashlib.sha1(b'Antho')
-mdp = mdp.hexdigest()
+# data = {}
+# data["email"] = "anthonydu77120@hotmail.fr"
+# data["password"] = "bc0a239cd4875a933da879c7990033808ecf4863"
+# new_player = {}
+# new_player["Antho"] = data
+#
+# with open('bdd_players.json', 'w') as outfile:
+#     json.dump(new_player, outfile)
 
-print mdp
 
-print os.path.abspath("train_board.py")
+with open('bdd_players.json') as json_file:
+    data = json.load(json_file)
+    print data["Antho"]
