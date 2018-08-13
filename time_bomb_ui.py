@@ -1,5 +1,14 @@
-import os, sys, json, hashlib
+import os
+import sys
+import json
+import random
+import hashlib
+import smtplib
+import re
+
 from PySide.QtGui import *
+from email import MIMEMultipart
+from email import MIMEText
 
 
 def read_bdd():
@@ -15,8 +24,8 @@ def write_bdd(new_bdd):
     bdd_player_path = os.getcwd()
     bdd_player_path = os.path.join(bdd_player_path, "bdd_players.json")
 
-    bdd = open(bdd_player_path, 'w')
-    bdd.write(str(new_bdd))
+    with open(bdd_player_path, 'w') as write_file:
+        json.dump(new_bdd, write_file, indent=4)
 
 
 def player_exist(player_login):
@@ -27,15 +36,32 @@ def player_exist(player_login):
 
 
 def encode_password(password):
-    input_password = hashlib.sha1(password)
+    input_password = hashlib.sha1(str(password))
     input_password = input_password.hexdigest()
 
     return input_password
 
 
-class connectionUi(QWidget):
+def generate_random_password():
+    return random.randint(10000000, 99999999)
+
+
+def players_infos(player):
+    bdd = read_bdd()
+    return bdd[player]
+
+
+def message_box(message_title, message_text):
+    message_box = QMessageBox()
+    message_box.setWindowTitle(message_title)
+    message_box.setText(message_text)
+
+    message_box.exec_()
+
+
+class ConnectionUi(QWidget):
     def __init__(self):
-        super(connectionUi, self).__init__()
+        super(ConnectionUi, self).__init__()
         self._init_ui()
 
     def _init_ui(self):
@@ -114,10 +140,10 @@ class connectionUi(QWidget):
         self.show()
 
     def create_account(self):
-       self.create_account_ui = createAccountUi()
+        self.create_account_ui = CreateAccountUi()
 
     def pass_forgot(self):
-        pass
+        self.forgot_password_ui = ForgotPasswordUi()
 
     def valid_password(self, player_login, player_password):
         bdd = read_bdd()
@@ -132,27 +158,19 @@ class connectionUi(QWidget):
             input_password = encode_password(self.line_edit_password.text())
 
             if self.valid_password(player_login, input_password):
-                self.join_game_ui = joinGameUi()
+                self.join_game_ui = JoinGameUi()
                 self.close()
 
             else:
-                message_box_wrong_password = QMessageBox()
-                message_box_wrong_password.setWindowTitle("Wrong Password")
-                message_box_wrong_password.setText("This is not a good password.")
-
-                message_box_wrong_password.exec_()
+                message_box('Wrong Password', 'This is not a good password.')
 
         else:
-            message_box_wrong_login = QMessageBox()
-            message_box_wrong_login.setWindowTitle("Wrong Login")
-            message_box_wrong_login.setText("This login doesn't exist yet.")
-
-            message_box_wrong_login.exec_()
+            message_box('Wrong Login', 'This login doesn\'t exist yet.')
 
 
-class createAccountUi(QWidget):
+class CreateAccountUi(QWidget):
     def __init__(self):
-        super(createAccountUi, self).__init__()
+        super(CreateAccountUi, self).__init__()
         self._init_ui()
 
     def _init_ui(self):
@@ -218,43 +236,116 @@ class createAccountUi(QWidget):
 
     def create_dict_player(self, player_password, player_email):
         player_dict = dict()
-        player_dict["email"] = player_email
-        player_dict["password"] = encode_password(player_password)
+        player_dict[u"email"] = unicode(player_email)
+        player_dict[u"password"] = unicode(encode_password(player_password))
 
         return player_dict
 
+    def valid_email(self, email):
+        verify_expression = re.compile(r"^[\w\S\._-]+@[\w\S\.-]+\.([a-zA-Z]{2,3})$")
+
+        if not re.search(verify_expression, email) is None:
+            return True
+
     def create_player(self):
         player_login = self.line_edit_login.text()
+        player_password = self.line_edit_password.text()
+        player_email = self.line_edit_email.text()
 
-        if not player_exist(player_login):
-            if self.same_password():
-                bdd = read_bdd()
-                new_player = self.create_dict_player(
-                    self.line_edit_password.text(),
-                    self.line_edit_email.text()
-                )
-                bdd[player_login] = new_player
-                print("yop")
-                # write_bdd(bdd)
+        if player_login != '' and player_password != '' and player_email != '':
+            if not player_exist(player_login):
+                if self.same_password():
+                    if self.valid_email(player_email):
+                        bdd = read_bdd()
+                        new_player = self.create_dict_player(player_password, player_email)
+                        bdd[player_login] = new_player
+                        write_bdd(bdd)
 
+                        message_box('OK', 'Your account is now active.')
+
+                        self.join_game_ui = JoinGameUi()
+                        self.close()
+                    else:
+                        message_box('Unvalid email', 'Please enter a valid email.')
+                else:
+                    message_box('Wrong Password', 'You have to input same passwords.')
             else:
-                message_box_wrong_password = QMessageBox()
-                message_box_wrong_password.setWindowTitle("Wrong Password")
-                message_box_wrong_password.setText("You have to input same passwords.")
-
-                message_box_wrong_password.exec_()
-
+                message_box('Wrong Login', 'This login already exist yet.')
         else:
-            message_box_wrong_login = QMessageBox()
-            message_box_wrong_login.setWindowTitle("Wrong Login")
-            message_box_wrong_login.setText("This login already exist yet.")
-
-            message_box_wrong_login.exec_()
+            message_box('', 'You have to complete all informations.')
 
 
-class joinGameUi(QWidget):
+class ForgotPasswordUi(QWidget):
     def __init__(self):
-        super(joinGameUi, self).__init__()
+        super(ForgotPasswordUi, self).__init__()
+        self._init_ui()
+
+    def _init_ui(self):
+        self.resize(250, 50)
+        self.setWindowTitle("Password forgot?")
+
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
+
+        self.widget_player_login = QWidget()
+        self.main_layout.addWidget(self.widget_player_login)
+        self.layout_player_login = QHBoxLayout()
+        self.widget_player_login.setLayout(self.layout_player_login)
+
+        self.label_player_login = QLabel("Player's login: ")
+        self.layout_player_login.addWidget(self.label_player_login)
+        self.line_edit_player_login = QLineEdit()
+        self.layout_player_login.addWidget(self.line_edit_player_login)
+
+        self.button_send = QPushButton("SEND NEW PASSWORD")
+        self.button_send.setMaximumWidth(125)
+        self.main_layout.addWidget(self.button_send)
+
+        self.button_send.clicked.connect(self.send_new_password)
+
+        self.show()
+
+    def assign_password_to_player(self, player, password):
+        bdd = read_bdd()
+        bdd[player]["password"] = encode_password(password)
+        write_bdd(bdd)
+
+    def send_new_password(self):
+        player_login = self.line_edit_player_login.text()
+        try:
+            from_adress = "time.bomb.antho@gmail.com"
+            to_adress = players_infos(player_login)["email"]
+
+            email_to_send = MIMEMultipart()
+            email_to_send['From'] = from_adress
+            email_to_send['To'] = to_adress
+            email_to_send['Subject'] = 'New Time Bomb Password'
+
+            new_password = generate_random_password()
+            self.assign_password_to_player(player_login, new_password)
+            email_body = (
+                'Your new time bomb password : ' + str(new_password) +
+                "\n\nYou'll could change it in your preferences.\n\nSee you soon in game!"
+            )
+            email_to_send.attach(MIMEText(email_body, 'plain'))
+
+            gmail_server = smtplib.SMTP('smtp.gmail.com', 587)
+            gmail_server.starttls()
+            gmail_server.login(from_adress, "TimeBomb78+")
+            gmail_server.sendmail(from_adress, to_adress, str(email_to_send))
+            gmail_server.quit()
+
+            message_box('OK', 'A new password has been send.')
+
+            self.close()
+
+        except KeyError:
+            message_box('Wrong Login', 'This login doesn\'t exist.')
+
+
+class JoinGameUi(QWidget):
+    def __init__(self):
+        super(JoinGameUi, self).__init__()
         self.init_ui()
 
     def init_ui(self):
@@ -264,23 +355,23 @@ class joinGameUi(QWidget):
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
 
-        self.create_game = QPushButton("Create New Game")
-        self.main_layout.addWidget(self.create_game)
+        self.button_create_game = QPushButton("Create New Game")
+        self.main_layout.addWidget(self.button_create_game)
 
-        self.servers_list = QListWidget()
-        self.main_layout.addWidget(self.servers_list)
+        self.list_servers = QListWidget()
+        self.main_layout.addWidget(self.list_servers)
 
-        self.create_game.clicked.connect(self.create_game_ui)
+        self.button_create_game.clicked.connect(self.create_game_ui)
 
         self.show()
 
     def create_game_ui(self):
-        self.create_game_ui = createGameUi()
+        self.create_game_ui = CreateGameUi()
 
 
-class createGameUi(QWidget):
+class CreateGameUi(QWidget):
     def __init__(self):
-        super(createGameUi, self).__init__()
+        super(CreateGameUi, self).__init__()
         self._init_ui()
 
     def _init_ui(self):
@@ -297,7 +388,7 @@ class createGameUi(QWidget):
         self.group_game_name = QWidget()
         self.layout_game_name = QHBoxLayout()
         self.group_game_name.setLayout(self.layout_game_name)
-        self.label_game_name =  QLabel("Game's Name: ")
+        self.label_game_name = QLabel("Game's Name: ")
         self.line_edit_game_name = QLineEdit()
 
         self.group_nb_players = QWidget()
@@ -387,11 +478,11 @@ class createGameUi(QWidget):
         self.show()
 
 
-def generateUi():
+def generate_ui():
     app = QApplication(sys.argv)
-    main_ui = connectionUi()
+    main_ui = ConnectionUi()
     sys.exit(app.exec_())
 
 
 if __name__ == "__main__":
-    generateUi()
+    generate_ui()
