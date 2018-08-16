@@ -68,12 +68,12 @@ class ConnectionUi(QWidget):
         self.resize(250, 150)
         self.setWindowTitle("Connection")
 
-        self.main_layout = QVBoxLayout()
-        self.setLayout(self.main_layout)
+        self.layout_main = QVBoxLayout()
+        self.setLayout(self.layout_main)
 
         # PLAYER UI
         self.group_player_infos = QGroupBox("Player's Infos")
-        self.main_layout.addWidget(self.group_player_infos)
+        self.layout_main.addWidget(self.group_player_infos)
 
         self.layout_player_infos = QVBoxLayout()
         self.group_player_infos.setLayout(self.layout_player_infos)
@@ -107,7 +107,7 @@ class ConnectionUi(QWidget):
 
         # CONNECTION UI
         self.widget_connect = QWidget()
-        self.main_layout.addWidget(self.widget_connect)
+        self.layout_main.addWidget(self.widget_connect)
 
         self.layout_connect = QHBoxLayout()
         self.widget_connect.setLayout(self.layout_connect)
@@ -133,32 +133,32 @@ class ConnectionUi(QWidget):
         self.button_connect = QPushButton("CONNECT")
         self.layout_connect.addWidget(self.button_connect)
 
-        self.button_create_account.clicked.connect(self.create_account)
-        self.button_pass_forgot.clicked.connect(self.pass_forgot)
-        self.button_connect.clicked.connect(self.connection_ui)
+        self.button_create_account.clicked.connect(self._create_account)
+        self.button_pass_forgot.clicked.connect(self._pass_forgot)
+        self.button_connect.clicked.connect(self._connection_ui)
 
         self.show()
 
-    def create_account(self):
+    def _create_account(self):
         self.create_account_ui = CreateAccountUi()
 
-    def pass_forgot(self):
+    def _pass_forgot(self):
         self.forgot_password_ui = ForgotPasswordUi()
 
-    def valid_password(self, player_login, player_password):
+    def _valid_password(self, player_login, player_password):
         bdd = read_bdd()
 
         if bdd[player_login]["password"] == player_password:
             return True
 
-    def connection_ui(self):
-        player_login = self.line_edit_login.text()
+    def _connection_ui(self):
+        self.player_login = self.line_edit_login.text()
 
-        if player_exist(player_login):
+        if player_exist(self.player_login):
             input_password = encode_password(self.line_edit_password.text())
 
-            if self.valid_password(player_login, input_password):
-                self.join_game_ui = JoinGameUi()
+            if self._valid_password(self.player_login, input_password):
+                self.join_game_ui = JoinGameUi(self.player_login)
                 self.close()
 
             else:
@@ -177,11 +177,11 @@ class CreateAccountUi(QWidget):
         self.resize(275, 275)
         self.setWindowTitle("Create Account")
 
-        self.main_layout = QVBoxLayout()
-        self.setLayout(self.main_layout)
+        self.layout_main = QVBoxLayout()
+        self.setLayout(self.layout_main)
 
         self.group_account_infos = QGroupBox("Account's Infos")
-        self.main_layout.addWidget(self.group_account_infos)
+        self.layout_main.addWidget(self.group_account_infos)
         self.layout_account_infos = QVBoxLayout()
         self.group_account_infos.setLayout(self.layout_account_infos)
 
@@ -224,46 +224,46 @@ class CreateAccountUi(QWidget):
         self.layout_email.addWidget(self.line_edit_email)
 
         self.button_create = QPushButton("CREATE ACCOUNT")
-        self.main_layout.addWidget(self.button_create)
+        self.layout_main.addWidget(self.button_create)
 
-        self.button_create.clicked.connect(self.create_player)
+        self.button_create.clicked.connect(self._create_player)
 
         self.show()
 
-    def same_password(self):
+    def _same_password(self):
         if self.line_edit_password.text() == self.line_edit_password_confirm.text():
             return True
 
-    def create_dict_player(self, player_password, player_email):
+    def _create_dict_player(self, player_password, player_email):
         player_dict = dict()
         player_dict[u"email"] = unicode(player_email)
         player_dict[u"password"] = unicode(encode_password(player_password))
 
         return player_dict
 
-    def valid_email(self, email):
+    def _valid_email(self, email):
         verify_expression = re.compile(r"^[\w\S\._-]+@[\w\S\.-]+\.([a-zA-Z]{2,3})$")
 
         if not re.search(verify_expression, email) is None:
             return True
 
-    def create_player(self):
+    def _create_player(self):
         player_login = self.line_edit_login.text()
         player_password = self.line_edit_password.text()
         player_email = self.line_edit_email.text()
 
         if player_login != '' and player_password != '' and player_email != '':
             if not player_exist(player_login):
-                if self.same_password():
-                    if self.valid_email(player_email):
+                if self._same_password():
+                    if self._valid_email(player_email):
                         bdd = read_bdd()
-                        new_player = self.create_dict_player(player_password, player_email)
+                        new_player = self._create_dict_player(player_password, player_email)
                         bdd[player_login] = new_player
                         write_bdd(bdd)
 
                         message_box('OK', 'Your account is now active.')
 
-                        self.join_game_ui = JoinGameUi()
+                        self.join_game_ui = JoinGameUi(player_login)
                         self.close()
                     else:
                         message_box('Unvalid email', 'Please enter a valid email.')
@@ -284,11 +284,11 @@ class ForgotPasswordUi(QWidget):
         self.resize(250, 50)
         self.setWindowTitle("Password forgot?")
 
-        self.main_layout = QVBoxLayout()
-        self.setLayout(self.main_layout)
+        self.layout_main = QVBoxLayout()
+        self.setLayout(self.layout_main)
 
         self.widget_player_login = QWidget()
-        self.main_layout.addWidget(self.widget_player_login)
+        self.layout_main.addWidget(self.widget_player_login)
         self.layout_player_login = QHBoxLayout()
         self.widget_player_login.setLayout(self.layout_player_login)
 
@@ -299,18 +299,18 @@ class ForgotPasswordUi(QWidget):
 
         self.button_send = QPushButton("SEND NEW PASSWORD")
         self.button_send.setMaximumWidth(125)
-        self.main_layout.addWidget(self.button_send)
+        self.layout_main.addWidget(self.button_send)
 
-        self.button_send.clicked.connect(self.send_new_password)
+        self.button_send.clicked.connect(self._send_new_password)
 
         self.show()
 
-    def assign_password_to_player(self, player, password):
+    def _assign_password_to_player(self, player, password):
         bdd = read_bdd()
         bdd[player]["password"] = encode_password(password)
         write_bdd(bdd)
 
-    def send_new_password(self):
+    def _send_new_password(self):
         player_login = self.line_edit_player_login.text()
         try:
             from_adress = "time.bomb.antho@gmail.com"
@@ -322,7 +322,7 @@ class ForgotPasswordUi(QWidget):
             email_to_send['Subject'] = 'New Time Bomb Password'
 
             new_password = generate_random_password()
-            self.assign_password_to_player(player_login, new_password)
+            self._assign_password_to_player(player_login, new_password)
             email_body = (
                 'Your new time bomb password : ' + str(new_password) +
                 "\n\nYou'll could change it in your preferences.\n\nSee you soon in game!"
@@ -343,29 +343,145 @@ class ForgotPasswordUi(QWidget):
             message_box('Wrong Login', 'This login doesn\'t exist.')
 
 
-class JoinGameUi(QWidget):
-    def __init__(self):
-        super(JoinGameUi, self).__init__()
-        self.init_ui()
+class SettingsProfileUi(QWidget):
+    def __init__(self, player_login):
+        super(SettingsProfileUi, self).__init__()
+        self.player_login = player_login
+        self._init_ui()
 
-    def init_ui(self):
-        self.resize(300, 250)
-        self.setWindowTitle("Server's Room")
+    def _init_ui(self):
+        self.resize(300, 100)
+        self.setWindowTitle('Settings')
 
-        self.main_layout = QVBoxLayout()
-        self.setLayout(self.main_layout)
+        self.layout_main = QVBoxLayout()
+        self.setLayout(self.layout_main)
 
-        self.button_create_game = QPushButton("Create New Game")
-        self.main_layout.addWidget(self.button_create_game)
+        self.widget_rename = QWidget()
+        self.layout_main.addWidget(self.widget_rename)
+        self.layout_rename = QHBoxLayout()
+        self.widget_rename.setLayout(self.layout_rename)
+        self.label_rename = QLabel('Login: ')
+        self.layout_rename.addWidget(self.label_rename)
+        self.line_edit_rename = QLineEdit()
+        self.line_edit_rename.setPlaceholderText(self.player_login)
+        self.layout_rename.addWidget(self.line_edit_rename)
 
-        self.list_servers = QListWidget()
-        self.main_layout.addWidget(self.list_servers)
+        self.widget_current_password = QWidget()
+        self.layout_main.addWidget(self.widget_current_password)
+        self.layout_current_password = QHBoxLayout()
+        self.widget_current_password.setLayout(self.layout_current_password)
+        self.label_current_password = QLabel('Current Password: ')
+        self.layout_current_password.addWidget(self.label_current_password)
+        self.line_edit_current_password = QLineEdit()
+        self.line_edit_current_password.setEchoMode(self.line_edit_current_password.Password)
+        self.layout_current_password.addWidget(self.line_edit_current_password)
 
-        self.button_create_game.clicked.connect(self.create_game_ui)
+        self.widget_new_password = QWidget()
+        self.layout_main.addWidget(self.widget_new_password)
+        self.layout_new_password = QHBoxLayout()
+        self.widget_new_password.setLayout(self.layout_new_password)
+        self.label_new_password = QLabel('New Password: ')
+        self.layout_new_password.addWidget(self.label_new_password)
+        self.line_edit_new_password = QLineEdit()
+        self.line_edit_new_password.setEchoMode(self.line_edit_new_password.Password)
+        self.layout_new_password.addWidget(self.line_edit_new_password)
+
+        self.widget_confirm_password = QWidget()
+        self.layout_main.addWidget(self.widget_confirm_password)
+        self.layout_confirm_password = QHBoxLayout()
+        self.widget_confirm_password.setLayout(self.layout_confirm_password)
+        self.label_confirm_password = QLabel('Confirm Password: ')
+        self.layout_confirm_password.addWidget(self.label_confirm_password)
+        self.line_edit_confirm_password = QLineEdit()
+        self.line_edit_confirm_password.setEchoMode(self.line_edit_confirm_password.Password)
+        self.layout_confirm_password.addWidget(self.line_edit_confirm_password)
+
+        self.button_update = QPushButton('UPDATE')
+        self.layout_main.addWidget(self.button_update)
+
+        self.button_update.clicked.connect(self._update_profile)
 
         self.show()
 
-    def create_game_ui(self):
+        self.line_edit_rename.clearFocus()
+
+    def _update_profile(self):
+        new_login = self.line_edit_rename.text()
+        current_password = self.line_edit_current_password.text()
+        new_password = self.line_edit_new_password.text()
+        confirm_password = self.line_edit_confirm_password.text()
+
+        bdd = read_bdd()
+        player_infos = bdd[self.player_login]
+
+        if new_login != "":
+            if not player_exist(new_login):
+                del bdd[self.player_login]
+
+                bdd[new_login] = player_infos
+            else:
+                message_box('', 'This login already exist.')
+
+        if new_password != "":
+            if encode_password(current_password) == player_infos["password"]:
+                if new_password == confirm_password:
+                    update_password = encode_password(new_password)
+
+                    player_infos["password"] = update_password
+                else:
+                    message_box('', 'Both password are not the same.')
+            else:
+                message_box('', 'You have to complete your current password.')
+
+        write_bdd(bdd)
+
+        message_box('OK', 'Update Complete!')
+        self.close()
+
+
+class JoinGameUi(QWidget):
+    def __init__(self, player_login):
+        super(JoinGameUi, self).__init__()
+        self.player_login = player_login
+        self._init_ui()
+
+    def _init_ui(self):
+        self.resize(300, 250)
+        self.setWindowTitle("Server's Room")
+
+        self.layout_main = QVBoxLayout()
+        self.setLayout(self.layout_main)
+
+        self.menu_main = QMenuBar()
+        self.layout_main.setMenuBar(self.menu_main)
+
+        self.menu_file = self.menu_main.addMenu('File')
+        self.menu_file.addAction('Exit', self._exit_profile)
+
+        self.menu_profile = self.menu_main.addMenu('Profile')
+        self.menu_profile.addAction('Stats', self._stat_profile)
+        self.menu_profile.addAction('Settings', self._settings_profile)
+
+        self.button_create_game = QPushButton("Create New Game")
+        self.layout_main.addWidget(self.button_create_game)
+
+        self.list_servers = QListWidget()
+        self.layout_main.addWidget(self.list_servers)
+
+        self.button_create_game.clicked.connect(self._create_game_ui)
+
+        self.show()
+
+    def _exit_profile(self):
+        self.close()
+
+    def _stat_profile(self):
+        print "STATS PROFILE"
+
+    def _settings_profile(self):
+        self.settings_profile_ui = SettingsProfileUi(self.player_login)
+
+    def _create_game_ui(self):
         self.create_game_ui = CreateGameUi()
 
 
@@ -382,98 +498,171 @@ class CreateGameUi(QWidget):
         self.setLayout(self.main_layout)
 
         self.group_game_info = QGroupBox("Game's Infos")
+        self.main_layout.addWidget(self.group_game_info)
         self.layout_game_info = QVBoxLayout()
         self.group_game_info.setLayout(self.layout_game_info)
 
         self.group_game_name = QWidget()
+        self.layout_game_info.addWidget(self.group_game_name)
         self.layout_game_name = QHBoxLayout()
         self.group_game_name.setLayout(self.layout_game_name)
+
         self.label_game_name = QLabel("Game's Name: ")
+        self.layout_game_name.addWidget(self.label_game_name)
+
         self.line_edit_game_name = QLineEdit()
+        self.layout_game_name.addWidget(self.line_edit_game_name)
 
         self.group_nb_players = QWidget()
+        self.layout_game_info.addWidget(self.group_nb_players)
         self.layout_nb_players = QHBoxLayout()
         self.group_nb_players.setLayout(self.layout_nb_players)
+
         self.label_nb_players = QLabel("Nb Players: ")
         self.label_nb_players.setMaximumWidth(70)
+        self.layout_nb_players.addWidget(self.label_nb_players)
+
         self.spin_box_nb_players = QSpinBox()
         self.spin_box_nb_players.setMaximumWidth(35)
         self.spin_box_nb_players.setRange(4, 8)
         self.spin_box_nb_players.setValue(4)
+        self.layout_nb_players.addWidget(self.spin_box_nb_players)
+
         self.spacer_nb_player = QSpacerItem(130, 20)
+        self.layout_nb_players.addItem(self.spacer_nb_player)
 
         self.group_settings = QGroupBox("Settings")
+        self.layout_game_info.addWidget(self.group_settings)
         self.layout_settings = QVBoxLayout()
         self.group_settings.setLayout(self.layout_settings)
 
         self.group_settings_team = QWidget()
+        self.layout_settings.addWidget(self.group_settings_team)
         self.layout_settings_team = QHBoxLayout()
         self.group_settings_team.setLayout(self.layout_settings_team)
+
         self.spacer1_settings_team = QSpacerItem(20, 40)
+        self.layout_settings_team.addItem(self.spacer1_settings_team)
+
         self.label_settings_team = QLabel("Teams: ")
         self.label_settings_team.setMaximumWidth(40)
+        self.layout_settings_team.addWidget(self.label_settings_team)
+
         self.radio_settings_team_auto = QRadioButton("Auto")
         self.radio_settings_team_auto.setMaximumWidth(70)
         self.radio_settings_team_auto.toggle()
+        self.layout_settings_team.addWidget(self.radio_settings_team_auto)
+        self.radio_settings_team_auto.clicked.connect(self._enable_manually_team)
+
         self.radio_settings_team_manually = QRadioButton("Manually")
         self.radio_settings_team_manually.setMaximumWidth(70)
+        self.layout_settings_team.addWidget(self.radio_settings_team_manually)
+        self.radio_settings_team_manually.clicked.connect(self._enable_manually_team)
+
         self.spacer2_settings_team = QSpacerItem(20, 40)
+        self.layout_settings_team.addItem(self.spacer2_settings_team)
 
         self.group_settings_manually = QWidget()
+        self.layout_settings.addWidget(self.group_settings_manually)
+        self.group_settings_manually.setEnabled(False)
         self.layout_settings_manually = QHBoxLayout()
         self.group_settings_manually.setLayout(self.layout_settings_manually)
+
         self.spacer1_settings_manually = QSpacerItem(20, 40)
+        self.layout_settings_manually.addItem(self.spacer1_settings_manually)
+
         self.label_settings_manually_sherlock = QLabel("Sherlock: ")
         self.label_settings_manually_sherlock.setMaximumWidth(50)
+        self.layout_settings_manually.addWidget(self.label_settings_manually_sherlock)
+
         self.spin_box_settings_manually_sherlock = QSpinBox()
         self.spin_box_settings_manually_sherlock.setMaximumWidth(35)
         self.spin_box_settings_manually_sherlock.setRange(1, 7)
         self.spin_box_settings_manually_sherlock.setValue(3)
+        self.layout_settings_manually.addWidget(self.spin_box_settings_manually_sherlock)
+
         self.label_settings_manually_moriarty = QLabel("Moriarty: ")
         self.label_settings_manually_moriarty.setMaximumWidth(50)
+        self.layout_settings_manually.addWidget(self.label_settings_manually_moriarty)
+
         self.spin_box_settings_manually_moriarty = QSpinBox()
         self.spin_box_settings_manually_moriarty.setMaximumWidth(35)
         self.spin_box_settings_manually_moriarty.setRange(1, 7)
         self.spin_box_settings_manually_moriarty.setValue(1)
+        self.layout_settings_manually.addWidget(self.spin_box_settings_manually_moriarty)
+
         self.spacer2_settings_manually = QSpacerItem(20, 40)
+        self.layout_settings_manually.addItem(self.spacer2_settings_manually)
 
         self.button_create_game = QPushButton("CREATE GAME")
         self.button_create_game.setMaximumWidth(150)
-
-        # Game Main Connections
-        self.main_layout.addWidget(self.group_game_info)
+        self.button_create_game.clicked.connect(self._game_ui)
         self.main_layout.addWidget(self.button_create_game)
 
-        # Game's Infos Connections
-        self.layout_game_info.addWidget(self.group_game_name)
-        self.layout_game_info.addWidget(self.group_nb_players)
-        self.layout_game_info.addWidget(self.group_settings)
+        self.show()
 
-        # Layout Game Name Connections
-        self.layout_game_name.addWidget(self.label_game_name)
-        self.layout_game_name.addWidget(self.line_edit_game_name)
+    def _enable_manually_team(self):
+        if self.radio_settings_team_manually.isChecked():
+            self.group_settings_manually.setEnabled(True)
 
-        # Layout Nb Players Connections
-        self.layout_nb_players.addWidget(self.label_nb_players)
-        self.layout_nb_players.addWidget(self.spin_box_nb_players)
-        self.layout_nb_players.addItem(self.spacer_nb_player)
+        else:
+            self.group_settings_manually.setEnabled(False)
 
-        # Layout Settings Connections
-        self.layout_settings.addWidget(self.group_settings_team)
-        self.layout_settings.addWidget(self.group_settings_manually)
+    def _game_ui(self):
+        game_name = self.line_edit_game_name.text()
+        self.game_ui = GameUi(game_name)
 
-        self.layout_settings_team.addItem(self.spacer1_settings_team)
-        self.layout_settings_team.addWidget(self.label_settings_team)
-        self.layout_settings_team.addWidget(self.radio_settings_team_auto)
-        self.layout_settings_team.addWidget(self.radio_settings_team_manually)
-        self.layout_settings_team.addItem(self.spacer2_settings_team)
 
-        self.layout_settings_manually.addItem(self.spacer1_settings_manually)
-        self.layout_settings_manually.addWidget(self.label_settings_manually_sherlock)
-        self.layout_settings_manually.addWidget(self.spin_box_settings_manually_sherlock)
-        self.layout_settings_manually.addWidget(self.label_settings_manually_moriarty)
-        self.layout_settings_manually.addWidget(self.spin_box_settings_manually_moriarty)
-        self.layout_settings_manually.addItem(self.spacer2_settings_manually)
+class GameUi(QWidget):
+    def __init__(self, game_name):
+        super(GameUi, self).__init__()
+        self.game_name = game_name
+        self._init_ui()
+
+    def _init_ui(self):
+        self.resize(300, 150)
+        self.setWindowTitle(self.game_name)
+
+        self.layout_main = QVBoxLayout()
+        self.setLayout(self.layout_main)
+
+        self.group_self_infos = QGroupBox()
+        self.layout_main.addWidget(self.group_self_infos)
+        self.layout_self_infos = QHBoxLayout()
+        self.group_self_infos.setLayout(self.layout_self_infos)
+
+        self.label_self_team = QLabel('Your team: [......]')
+        self.layout_self_infos.addWidget(self.label_self_team)
+
+        self.label_self_deck = QLabel('Your deck: [......]')
+        self.layout_self_infos.addWidget(self.label_self_deck)
+
+        self.group_game_infos = QGroupBox()
+        self.layout_main.addWidget(self.group_game_infos)
+        self.layout_game_infos = QHBoxLayout()
+        self.group_game_infos.setLayout(self.layout_game_infos)
+
+        self.label_round_left = QLabel('Round left: [.]')
+        self.layout_game_infos.addWidget(self.label_round_left)
+
+        self.label_wire_count = QLabel('Wire found: [.]')
+        self.layout_game_infos.addWidget(self.label_wire_count)
+
+        self.label_current_player = QLabel('Current Player: [......]')
+        self.layout_game_infos.addWidget(self.label_current_player)
+
+        self.widget_tchat_ui = QWidget()
+        self.layout_main.addWidget(self.widget_tchat_ui)
+        self.layout_tchat_ui = QVBoxLayout()
+        self.widget_tchat_ui.setLayout(self.layout_tchat_ui)
+
+        self.line_edit_recv_messages = QLineEdit()
+        self.line_edit_recv_messages.setReadOnly(True)
+        self.layout_tchat_ui.addWidget(self.line_edit_recv_messages)
+
+        self.line_edit_send_answers = QLineEdit()
+        self.line_edit_send_answers.setEnabled(False)
+        self.layout_tchat_ui.addWidget(self.line_edit_send_answers)
 
         self.show()
 
